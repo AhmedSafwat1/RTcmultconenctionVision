@@ -5,12 +5,84 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 var httpServer = require('http');
+const mongoose = require("mongoose");
+const Room     = require("./Models/Room")
+
 
 const ioServer = require('socket.io');
 const RTCMultiConnectionServer = require('rtcmulticonnection-server');
+const ChatDire = path.join(__dirname,"Chats");
+// console.log(ChatDire)
+//mongoose connect
+// const uri = "mongodb+srv://safwat:123@cluster0-wf8az.mongodb.net/test?retryWrites=true&w=majority"
+let db_url='mongodb+srv://safwat2:123@cluster0-wf8az.mongodb.net/test?retryWrites=true';
+const uri = "mongodb://safwat:safwat123@ds263127.mlab.com:63127/safwattest";
+let dev_db_url = 'mongodb+srv://safwat:123@cluster0-qlihz.mongodb.net/test?retryWrites=true';
+mongoose.set('useNewUrlParser', true);
+mongoose.set('useFindAndModify', false);
+mongoose.set('useCreateIndex', true);
+mongoose.set('useUnifiedTopology', true);
+mongoose.connect(uri)
+    .then(()=>console.log("connect to mongo"))
+    .catch((error)=>console.error(error))
+
+// get the data in room
+function getJson(roomName){
+    let pathFile = path.join(ChatDire,roomName+".json")
+    let data     = {"messages": [] }
+    if(fs.existsSync(pathFile)) {
+        data     = fs.readFileSync(pathFile);
+        data     = JSON.parse(data)
+    }
+    else {
+        let json = JSON.stringify(data);
+        fs.writeFileSync(pathFile, json);
+    }
+    return data
+
+}
+
+// read from the mongose
+async function  getJsonMongo(roomName){
+   let data =  await Room.findOne({
+        room_id:roomName
+    },{_id: 0 });
+   if(data)
+        return data;
+   data = await Room.create({ room_id:roomName })
+   return data
+}
+// save in mongoose
+
+async function  saveMessageMongo (roomName, mesg) {
+   await Room.findOneAndUpdate({room_id: roomName}, {$push: {messages: mesg}});
+}
+
+async function  deleteRoomMongo(roomName) {
+    await Room.remove({room_id: roomName})
+}
+ // getJson("saas1569507663351")
+// save new message IN room
+function saveMessage(roomName , mesg){
+    let pathFile = path.join(ChatDire,roomName+".json")
+    let data     = getJson(roomName);
+    data.messages.push(mesg)
+    let json = JSON.stringify(data);
+    fs.writeFileSync(pathFile, json);
+}
+
+// delete all mesage
+function deleteMessage(roomName ){
+    let pathFile = path.join(ChatDire,roomName+".json")
+    let data     = getJson(roomName);
+    data.messages= [];
+    let json = JSON.stringify(data);
+    fs.writeFileSync(pathFile, json);
+}
+
 
 var PORT = 9001;
-var isUseHTTPs = false;
+var isUseHTTPs = true;
 
 const jsonPath = {
     config: 'config.json',
@@ -237,13 +309,13 @@ if (isUseHTTPs) {
         console.log(BASH_COLORS_HELPER.getRedFG(), 'sslKey:\t ' + config.sslKey + ' does not exist.');
     } else {
         pfx = config.sslKey.indexOf('.pfx') !== -1;
-        options.key = fs.readFileSync(config.sslKey);
+        options.key = fs.readFileSync(config.sslKey, 'utf8');
     }
 
     if (!fs.existsSync(config.sslCert)) {
         console.log(BASH_COLORS_HELPER.getRedFG(), 'sslCert:\t ' + config.sslCert + ' does not exist.');
     } else {
-        options.cert = fs.readFileSync(config.sslCert);
+        options.cert = fs.readFileSync(config.sslCert,  'utf8');
     }
 
     if (config.sslCabundle) {
@@ -251,7 +323,7 @@ if (isUseHTTPs) {
             console.log(BASH_COLORS_HELPER.getRedFG(), 'sslCabundle:\t ' + config.sslCabundle + ' does not exist.');
         }
 
-        options.ca = fs.readFileSync(config.sslCabundle);
+        options.ca = fs.readFileSync(config.sslCabundle, 'utf8');
     }
 
     if (pfx === true) {
@@ -272,8 +344,8 @@ httpApp = httpApp.listen(process.env.PORT || PORT, process.env.IP || "0.0.0.0", 
 
 // --------------------------
 // socket.io codes goes below
-
-ioServer(httpApp).on('connection', function(socket) {
+let io = ioServer(httpApp);
+io.on('connection', function(socket) {
     RTCMultiConnectionServer.addSocket(socket, config);
 
     // ----------------------
@@ -288,4 +360,46 @@ ioServer(httpApp).on('connection', function(socket) {
     socket.on(params.socketCustomEvent, function(message) {
         socket.broadcast.emit(params.socketCustomEvent, message);
     });
+
+    // RUN WHEN user join to class
+    socket.on("join-room",async function  (room) {
+        try {
+            let data = await getJsonMongo(room)
+            data     = data.messages
+
+            socket.join(room)
+            socket.emit('all-message', data);
+        }
+        catch (e) {
+            socket.emit('error', e);
+        }
+
+    })
+
+    // run when user send the message
+    socket.on("send-message", async function (data) {
+        try {
+            await saveMessageMongo(data.room, data)
+            io.in(data.room).emit('revieve-message', data);
+        }
+        catch (e) {
+            socket.emit('error', e);
+        }
+    })
+
+    socket.on("clear-chat", async  function (room) {
+        try {
+          await  deleteRoomMongo(room)
+          io.in(data.room).emit('clear-messages', data.msg);
+        }
+        catch (e) {
+            socket.emit('error', e);
+        }
+    })
+
+
+    socket.on("class-close",function (room_id) {
+        console.log("in ", room_id)
+        socket.broadcast.emit("class-close", room_id);
+    })
 });

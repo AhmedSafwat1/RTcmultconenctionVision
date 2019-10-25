@@ -44,9 +44,15 @@ function getHTMLMediaElement(mediaElement, config) {
     var mediaElementContainer = document.createElement('div');
     mediaElementContainer.className = 'media-container';
 
+    var img                   = document.createElement('img');
+    img.className             = 'poster-vedio';
+    img.style.display         = "none";
+    if (config.photo)
+        img.src               = config.photo
     var mediaControls = document.createElement('div');
     mediaControls.className = 'media-controls';
     mediaElementContainer.appendChild(mediaControls);
+    mediaElementContainer.appendChild(img);
 
     if (buttons.has('mute-audio')) {
         var muteAudio = document.createElement('div');
@@ -78,12 +84,14 @@ function getHTMLMediaElement(mediaElement, config) {
                 muteVideo.className = muteVideo.className.replace('unmute-video selected', 'mute-video');
                 mediaElement.muted = false;
                 mediaElement.volume = 1;
+
                 mediaElement.play();
                 if (config.onUnMuted) config.onUnMuted('video');
             } else {
                 muteVideo.className = muteVideo.className.replace('mute-video', 'unmute-video selected');
                 mediaElement.muted = true;
                 mediaElement.volume = 0;
+
                 mediaElement.pause();
                 if (config.onMuted) config.onMuted('video');
             }
@@ -196,17 +204,18 @@ function getHTMLMediaElement(mediaElement, config) {
         }
 
         function exitFullScreen() {
-            if (document.fullscreen) {
-                document.cancelFullScreen();
-            }
-
-            if (document.mozFullScreen) {
-                document.mozCancelFullScreen();
-            }
-
             if (document.webkitIsFullScreen) {
                 document.webkitCancelFullScreen();
             }
+            if (document.mozFullScreen) {
+                document.mozCancelFullScreen();
+            }
+            if (document.cancelFullScreen) {
+                document.cancelFullScreen();
+            }
+
+
+
         }
 
         function screenStateChange(e) {

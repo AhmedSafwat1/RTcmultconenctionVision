@@ -48,15 +48,17 @@
     "muaz-khan"
   ],
   "dependencies": {
+    "@hapi/joi": "^16.1.4",
     "canvas-designer": "latest",
     "detectrtc": "latest",
     "fbr": "latest",
     "getstats": "latest",
+    "mongoose": "^5.7.1",
     "multistreamsmixer": "latest",
-    "recordrtc": "latest",
+    "recordrtc": "^5.5.8",
     "rtcmulticonnection-server": "latest",
     "socket.io": "latest",
-    "webrtc-adapter": "latest"
+    "webrtc-adapter": "^7.3.0"
   },
   "analyze": false,
   "license": "MIT",
